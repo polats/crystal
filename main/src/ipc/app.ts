@@ -28,6 +28,15 @@ export function registerAppHandlers(ipcMain: IpcMain, services: AppServices): vo
     }
   });
 
+  ipcMain.handle('get-current-working-directory', () => {
+    try {
+      return { success: true, data: process.cwd() };
+    } catch (error) {
+      console.error('Failed to get current working directory:', error);
+      return { success: false, error: error instanceof Error ? error.message : 'Failed to get current working directory' };
+    }
+  });
+
   // Welcome tracking handler (for compatibility)
   ipcMain.handle('track-welcome-dismissed', () => {
     // This handler exists for compatibility with other parts of the codebase

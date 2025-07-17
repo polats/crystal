@@ -411,6 +411,14 @@ export class API {
       return window.electronAPI.stravu.searchNotebooks(query, limit);
     },
   };
+
+  // System utilities
+  static system = {
+    async getCurrentWorkingDirectory() {
+      if (!isElectron()) throw new Error('Electron API not available');
+      return window.electronAPI.getCurrentWorkingDirectory();
+    },
+  };
 }
 
 // Legacy support - removed as migration is complete

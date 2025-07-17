@@ -27,45 +27,77 @@ export function registerProjectHandlers(ipcMain: IpcMain, services: AppServices)
   ipcMain.handle('projects:create', async (_event, projectData: any) => {
     try {
       console.log('[Main] Creating project:', projectData);
+      console.log('[Main] Current working directory:', process.cwd());
+      console.log('[Main] Project path to create:', projectData.path);
 
       // Import fs and exec utilities
       const { mkdirSync, existsSync } = require('fs');
       const { execSync: nodeExecSync } = require('child_process');
 
+      // Resolve the absolute path
+      const { resolve } = require('path');
+      const absolutePath = resolve(projectData.path);
+      console.log('[Main] Resolved absolute path:', absolutePath);
+      
       // Create directory if it doesn't exist
-      if (!existsSync(projectData.path)) {
-        console.log('[Main] Creating directory:', projectData.path);
-        mkdirSync(projectData.path, { recursive: true });
+      if (!existsSync(absolutePath)) {
+        console.log('[Main] Creating directory:', absolutePath);
+        mkdirSync(absolutePath, { recursive: true });
+      } else {
+        console.log('[Main] Directory already exists:', absolutePath);
       }
+      
+      // Update projectData.path to use the absolute path for git operations
+      projectData.path = absolutePath;
 
-      // Check if it's a git repository
+      // Check if it's a git repository by looking for .git folder directly
       let isGitRepo = false;
-      try {
-        nodeExecSync(`cd "${projectData.path}" && git rev-parse --is-inside-work-tree`, { encoding: 'utf-8' });
+      const gitPath = require('path').join(projectData.path, '.git');
+      
+      if (existsSync(gitPath)) {
         isGitRepo = true;
-        console.log('[Main] Directory is already a git repository');
-      } catch (error) {
-        console.log('[Main] Directory is not a git repository, initializing...');
+        console.log('[Main] Directory is already a git repository (.git folder found at:', gitPath, ')');
+      } else {
+        console.log('[Main] Directory is not a git repository (.git folder not found), will initialize new repo');
+        // Always initialize a new git repository for alpha projects
+        // Don't check for parent git repositories as we want isolated repos
+        isGitRepo = false;
       }
 
       // Initialize git if needed
       if (!isGitRepo) {
         try {
+          // Test if git is available
+          console.log('[Main] Testing git availability...');
+          nodeExecSync('git --version', { encoding: 'utf-8' });
+          console.log('[Main] Git is available');
+          
           // Always use 'main' as the default branch name for new repos
           const branchName = 'main';
 
-          nodeExecSync(`cd "${projectData.path}" && git init`, { encoding: 'utf-8' });
+          console.log('[Main] Initializing git repository at:', projectData.path);
+          const initResult = nodeExecSync('git init', { encoding: 'utf-8', cwd: projectData.path });
+          console.log('[Main] Git init result:', initResult);
           console.log('[Main] Git repository initialized successfully');
 
           // Create and checkout the main branch
-          nodeExecSync(`cd "${projectData.path}" && git checkout -b ${branchName}`, { encoding: 'utf-8' });
+          nodeExecSync(`git checkout -b ${branchName}`, { encoding: 'utf-8', cwd: projectData.path });
           console.log(`[Main] Created and checked out branch: ${branchName}`);
 
           // Create initial commit
-          nodeExecSync(`cd "${projectData.path}" && git commit -m "Initial commit" --allow-empty`, { encoding: 'utf-8' });
+          nodeExecSync('git commit -m "Initial commit" --allow-empty', { encoding: 'utf-8', cwd: projectData.path });
           console.log('[Main] Created initial empty commit');
+          
+          // Verify git folder was created
+          const gitPath = require('path').join(projectData.path, '.git');
+          if (existsSync(gitPath)) {
+            console.log('[Main] Verified .git folder exists at:', gitPath);
+          } else {
+            console.error('[Main] ERROR: .git folder not found at:', gitPath);
+          }
         } catch (error) {
           console.error('[Main] Failed to initialize git repository:', error);
+          console.error('[Main] Error details:', error);
           // Continue anyway - let the user handle git setup manually if needed
         }
       }

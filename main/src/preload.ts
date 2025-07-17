@@ -32,6 +32,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   // System utilities
   openExternal: (url: string): Promise<IPCResponse> => ipcRenderer.invoke('openExternal', url),
+  getCurrentWorkingDirectory: (): Promise<IPCResponse<string>> => ipcRenderer.invoke('get-current-working-directory'),
 
   // Session management
   sessions: {

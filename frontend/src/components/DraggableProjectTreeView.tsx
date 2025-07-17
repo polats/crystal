@@ -596,8 +596,19 @@ export function DraggableProjectTreeView() {
     if (!newAlphaName) return;
 
     try {
-      // Create the project in ./alphas/{name} (relative to current working directory)
-      const alphaPath = `alphas/${newAlphaName}`;
+      // Get the current working directory and create absolute path
+      const cwdResponse = await API.system.getCurrentWorkingDirectory();
+      if (!cwdResponse.success) {
+        showError({
+          title: 'Failed to Get Current Directory',
+          error: cwdResponse.error || 'Could not determine current working directory.',
+          details: cwdResponse.details
+        });
+        return;
+      }
+
+      // Create the project in {cwd}/alphas/{name} (absolute path)
+      const alphaPath = `${cwdResponse.data}/alphas/${newAlphaName}`;
       
       const alphaProject = {
         name: newAlphaName,
