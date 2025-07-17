@@ -2,7 +2,7 @@ import { IpcMain } from 'electron';
 import type { AppServices } from './types';
 
 export function registerProjectHandlers(ipcMain: IpcMain, services: AppServices): void {
-  const { databaseService, sessionManager, worktreeManager } = services;
+  const { databaseService, sessionManager, worktreeManager, app } = services;
 
   ipcMain.handle('projects:get-all', async () => {
     try {
@@ -111,6 +111,61 @@ export function registerProjectHandlers(ipcMain: IpcMain, services: AppServices)
         } catch (error) {
           console.log('[Main] Could not detect main branch, skipping:', error);
           // Not a git repository or error detecting, that's okay
+        }
+      }
+
+      // Check if this is an alpha project (path contains /alphas/)
+      const isAlphaProject = projectData.path.includes('/alphas/');
+      
+      // Copy template files for alpha projects
+      if (isAlphaProject) {
+        console.log('[Main] Alpha project detected, copying template files...');
+        try {
+          const { readdirSync, copyFileSync, readFileSync, writeFileSync } = require('fs');
+          const path = require('path');
+          
+          // Get the app directory (where templates folder is located)
+          const appDir = app.isPackaged 
+            ? path.dirname(app.getPath('exe'))
+            : process.cwd();
+          
+          const templatesDir = path.join(appDir, 'templates');
+          console.log('[Main] Templates directory:', templatesDir);
+          
+          if (existsSync(templatesDir)) {
+            // Read all files from templates directory
+            const templateFiles = readdirSync(templatesDir);
+            console.log('[Main] Template files found:', templateFiles);
+            
+            for (const file of templateFiles) {
+              const sourcePath = path.join(templatesDir, file);
+              let destFileName = file;
+              
+              // Rename initial-core-memory.md to CLAUDE.md
+              if (file === 'initial-core-memory.md') {
+                destFileName = 'CLAUDE.md';
+              }
+              
+              const destPath = path.join(projectData.path, destFileName);
+              
+              if (file === 'README.md') {
+                // Read, replace placeholder, and write
+                let content = readFileSync(sourcePath, 'utf-8');
+                content = content.replace('$ALPHA_NAME', projectData.name);
+                writeFileSync(destPath, content);
+                console.log('[Main] Copied and processed README.md');
+              } else {
+                // Just copy the file
+                copyFileSync(sourcePath, destPath);
+                console.log(`[Main] Copied ${file} as ${destFileName}`);
+              }
+            }
+          } else {
+            console.log('[Main] Templates directory not found at:', templatesDir);
+          }
+        } catch (error) {
+          console.error('[Main] Failed to copy template files:', error);
+          // Continue anyway - project creation should not fail due to template copy failure
         }
       }
 
