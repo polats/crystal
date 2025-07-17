@@ -44,6 +44,8 @@ export function DraggableProjectTreeView() {
   const [selectedProjectForSettings, setSelectedProjectForSettings] = useState<Project | null>(null);
   const [showAddProjectDialog, setShowAddProjectDialog] = useState(false);
   const [newProject, setNewProject] = useState({ name: '', path: '', buildScript: '', runScript: '' });
+  const [showAddAlphaDialog, setShowAddAlphaDialog] = useState(false);
+  const [newAlphaName, setNewAlphaName] = useState('');
   const activeSessionId = useSessionStore((state) => state.activeSessionId);
   const [showMainBranchWarning, setShowMainBranchWarning] = useState(false);
   const [pendingMainBranchProject, setPendingMainBranchProject] = useState<Project | null>(null);
@@ -590,6 +592,48 @@ export function DraggableProjectTreeView() {
     }
   };
 
+  const handleCreateAlpha = async () => {
+    if (!newAlphaName) return;
+
+    try {
+      // Create the project in ./alphas/{name} (relative to current working directory)
+      const alphaPath = `alphas/${newAlphaName}`;
+      
+      const alphaProject = {
+        name: newAlphaName,
+        path: alphaPath,
+        buildScript: '',
+        runScript: ''
+      };
+
+      const response = await API.projects.create(alphaProject);
+
+      if (!response.success) {
+        showError({
+          title: 'Failed to Create Alpha',
+          error: response.error || 'An error occurred while creating the alpha project.',
+          details: response.details,
+          command: response.command
+        });
+        return;
+      }
+
+      setShowAddAlphaDialog(false);
+      setNewAlphaName('');
+      
+      // Add the new alpha project to the list without reloading everything
+      const newAlphaWithSessions = { ...response.data, sessions: [], folders: [] };
+      setProjectsWithSessions(prev => [...prev, newAlphaWithSessions]);
+    } catch (error: any) {
+      console.error('Failed to create alpha:', error);
+      showError({
+        title: 'Failed to Create Alpha',
+        error: error.message || 'An error occurred while creating the alpha project.',
+        details: error.stack || error.toString()
+      });
+    }
+  };
+
   const handleCreateFolder = async () => {
     if (!newFolderName || !selectedProjectForFolder) return;
 
@@ -1036,16 +1080,25 @@ export function DraggableProjectTreeView() {
     <>
       <div className="space-y-1 px-2 pb-2">
         {projectsWithSessions.length === 0 ? (
-          <EmptyState
-            icon={FolderIcon}
-            title="No Projects Yet"
-            description="Add your first project to start managing Claude Code sessions."
-            action={{
-              label: 'Add Project',
-              onClick: () => setShowAddProjectDialog(true)
-            }}
-            className="py-8"
-          />
+          <>
+            <EmptyState
+              icon={FolderIcon}
+              title="No Projects Yet"
+              description="Add your first project to start managing Claude Code sessions."
+              action={{
+                label: 'Add Project',
+                onClick: () => setShowAddProjectDialog(true)
+              }}
+              className="py-8"
+            />
+            <button
+              onClick={() => setShowAddAlphaDialog(true)}
+              className="w-full mt-2 px-2 py-1.5 text-sm text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-200 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded transition-colors flex items-center justify-center space-x-2"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Create Alpha</span>
+            </button>
+          </>
         ) : (
           <>
             {projectsWithSessions.map((project) => {
@@ -1314,6 +1367,14 @@ export function DraggableProjectTreeView() {
               <Plus className="w-4 h-4" />
               <span>New Project</span>
             </button>
+            
+            <button
+              onClick={() => setShowAddAlphaDialog(true)}
+              className="w-full mt-1 px-2 py-1.5 text-sm text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-200 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded transition-colors flex items-center justify-center space-x-2"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Create Alpha</span>
+            </button>
           </>
         )}
       </div>
@@ -1469,6 +1530,58 @@ export function DraggableProjectTreeView() {
                 className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
                 Add Project
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      
+      {/* Create Alpha Dialog */}
+      {showAddAlphaDialog && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-96 shadow-xl border border-gray-200 dark:border-gray-700">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-200 mb-4">Create Alpha Project</h3>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Alpha Name
+                </label>
+                <input
+                  type="text"
+                  value={newAlphaName}
+                  onChange={(e) => setNewAlphaName(e.target.value)}
+                  className="w-full px-3 py-2 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-md text-gray-900 dark:text-gray-200 focus:outline-none focus:border-blue-500 placeholder-gray-500 dark:placeholder-gray-400"
+                  placeholder="my-alpha-project"
+                  autoFocus
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && newAlphaName.trim()) {
+                      handleCreateAlpha();
+                    }
+                  }}
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  This will create a new project at ./alphas/{newAlphaName || 'project-name'}
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-6 flex justify-end space-x-3">
+              <button
+                onClick={() => {
+                  setShowAddAlphaDialog(false);
+                  setNewAlphaName('');
+                }}
+                className="px-4 py-2 text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleCreateAlpha}
+                disabled={!newAlphaName.trim()}
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                Create Alpha
               </button>
             </div>
           </div>
