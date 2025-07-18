@@ -491,8 +491,27 @@ async function generateAvatarImage(projectPath: string, templatesDir: string, se
     const finalImageBuffer = Buffer.from(imageData.b64_json, 'base64');
     console.log('[Main] Image generated successfully');
     
-    // Save image as pfp.png in the project directory
+    // Check if there's an existing pfp.png to backup
     const imagePath = path.join(projectPath, 'pfp.png');
+    const { existsSync: fsExistsSync, mkdirSync, copyFileSync } = require('fs');
+    if (fsExistsSync(imagePath)) {
+      // Create pfp backup folder if it doesn't exist
+      const backupDir = path.join(projectPath, 'pfp');
+      if (!fsExistsSync(backupDir)) {
+        mkdirSync(backupDir, { recursive: true });
+        console.log('[Main] Created pfp backup directory:', backupDir);
+      }
+      
+      // Generate backup filename with timestamp
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5); // Format: YYYY-MM-DDTHH-MM-SS
+      const backupPath = path.join(backupDir, `pfp-${timestamp}.png`);
+      
+      // Move existing pfp.png to backup
+      copyFileSync(imagePath, backupPath);
+      console.log('[Main] Backed up existing avatar to:', backupPath);
+    }
+    
+    // Save new image as pfp.png in the project directory
     writeFileSync(imagePath, finalImageBuffer);
     console.log('[Main] Avatar image saved to:', imagePath);
     
