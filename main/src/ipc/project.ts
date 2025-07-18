@@ -184,6 +184,9 @@ export function registerProjectHandlers(ipcMain: IpcMain, services: AppServices)
         }
       }
 
+      // Check if this is an alpha project and set alpha_view to true by default
+      const isAlphaProjectForCreation = projectData.path.includes('/alphas/');
+      
       const project = databaseService.createProject(
         projectData.name,
         projectData.path,
@@ -191,7 +194,9 @@ export function registerProjectHandlers(ipcMain: IpcMain, services: AppServices)
         projectData.runScript,
         projectData.buildScript,
         undefined, // default_permission_mode
-        projectData.openIdeCommand
+        projectData.openIdeCommand,
+        undefined, // worktree_folder
+        isAlphaProjectForCreation // alpha_view - default to true for alpha projects
       );
 
       // If run_script was provided, also create run commands

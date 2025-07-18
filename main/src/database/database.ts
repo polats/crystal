@@ -642,10 +642,19 @@ export class DatabaseService {
       this.db.prepare("ALTER TABLE projects ADD COLUMN worktree_folder TEXT").run();
       console.log('[Database] Added worktree_folder column to projects table');
     }
+    
+    // Add alpha_view column to projects table if it doesn't exist
+    const projectsTableInfoAlphaView = this.db.prepare("PRAGMA table_info(projects)").all();
+    const hasAlphaViewColumn = projectsTableInfoAlphaView.some((col: any) => col.name === 'alpha_view');
+    
+    if (!hasAlphaViewColumn) {
+      this.db.prepare("ALTER TABLE projects ADD COLUMN alpha_view BOOLEAN NOT NULL DEFAULT 0").run();
+      console.log('[Database] Added alpha_view column to projects table');
+    }
   }
 
   // Project operations
-  createProject(name: string, path: string, systemPrompt?: string, runScript?: string, mainBranch?: string, buildScript?: string, defaultPermissionMode?: 'approve' | 'ignore', openIdeCommand?: string): Project {
+  createProject(name: string, path: string, systemPrompt?: string, runScript?: string, buildScript?: string, defaultPermissionMode?: 'approve' | 'ignore', openIdeCommand?: string, worktreeFolder?: string, alphaView?: boolean): Project {
     // Get the max display_order for projects
     const maxOrderResult = this.db.prepare(`
       SELECT MAX(display_order) as max_order 
@@ -655,9 +664,9 @@ export class DatabaseService {
     const displayOrder = (maxOrderResult?.max_order ?? -1) + 1;
     
     const result = this.db.prepare(`
-      INSERT INTO projects (name, path, system_prompt, run_script, build_script, default_permission_mode, open_ide_command, display_order)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(name, path, systemPrompt || null, runScript || null, buildScript || null, defaultPermissionMode || 'ignore', openIdeCommand || null, displayOrder);
+      INSERT INTO projects (name, path, system_prompt, run_script, build_script, default_permission_mode, open_ide_command, worktree_folder, alpha_view, display_order)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(name, path, systemPrompt || null, runScript || null, buildScript || null, defaultPermissionMode || 'ignore', openIdeCommand || null, worktreeFolder || null, alphaView ? 1 : 0, displayOrder);
     
     const project = this.getProject(result.lastInsertRowid as number);
     if (!project) {
@@ -730,6 +739,10 @@ export class DatabaseService {
     if (updates.active !== undefined) {
       fields.push('active = ?');
       values.push(updates.active ? 1 : 0);
+    }
+    if (updates.alpha_view !== undefined) {
+      fields.push('alpha_view = ?');
+      values.push(updates.alpha_view ? 1 : 0);
     }
 
     if (fields.length === 0) {

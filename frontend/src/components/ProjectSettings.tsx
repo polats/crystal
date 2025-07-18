@@ -27,6 +27,7 @@ export default function ProjectSettings({ project, isOpen, onClose, onUpdate, on
   const [avatarData, setAvatarData] = useState<string | null>(null);
   const [isGeneratingAvatar, setIsGeneratingAvatar] = useState(false);
   const [isLoadingAvatar, setIsLoadingAvatar] = useState(false);
+  const [alphaView, setAlphaView] = useState(false);
   const { showError } = useErrorStore();
 
   useEffect(() => {
@@ -46,6 +47,7 @@ export default function ProjectSettings({ project, isOpen, onClose, onUpdate, on
       }
       setOpenIdeCommand(project.open_ide_command || '');
       setWorktreeFolder(project.worktree_folder || '');
+      setAlphaView(project.alpha_view || false);
       setError(null);
       
       // Load avatar for alpha projects
@@ -111,7 +113,8 @@ export default function ProjectSettings({ project, isOpen, onClose, onUpdate, on
         run_script: runScript || null,
         build_script: buildScript || null,
         open_ide_command: openIdeCommand || null,
-        worktree_folder: worktreeFolder || null
+        worktree_folder: worktreeFolder || null,
+        alpha_view: alphaView
       });
 
       if (!response.success) {
@@ -168,7 +171,32 @@ export default function ProjectSettings({ project, isOpen, onClose, onUpdate, on
           )}
 
           <div className="space-y-6">
-            {/* Basic Information */}
+            {/* View Mode Toggle - Only for Alpha Projects */}
+            {project.path.includes('/alphas/') && (
+              <div className="flex items-center justify-between p-4 bg-gray-100 dark:bg-gray-900 rounded-lg border border-gray-300 dark:border-gray-700">
+                <div>
+                  <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Alpha View</label>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                    Simplified settings for alpha projects
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setAlphaView(!alphaView)}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                    alphaView ? 'bg-blue-600' : 'bg-gray-300 dark:bg-gray-600'
+                  }`}
+                >
+                  <span
+                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                      alphaView ? 'translate-x-6' : 'translate-x-1'
+                    }`}
+                  />
+                </button>
+              </div>
+            )}
+
+            {/* Basic Information - Always shown */}
             <div>
               <h3 className="text-lg font-medium text-gray-900 dark:text-gray-200 mb-4">Basic Information</h3>
               <div className="space-y-4">
@@ -185,10 +213,11 @@ export default function ProjectSettings({ project, isOpen, onClose, onUpdate, on
                   />
                 </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Repository Path
-                  </label>
+                {!alphaView && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Repository Path
+                    </label>
                   <div className="flex gap-2">
                     <input
                       type="text"
@@ -216,25 +245,28 @@ export default function ProjectSettings({ project, isOpen, onClose, onUpdate, on
                   <p className="mt-1 text-xs text-gray-600 dark:text-gray-500">
                     The local path to the git repository for this project
                   </p>
-                </div>
+                  </div>
+                )}
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Current Branch (Auto-detected)
-                  </label>
+                {!alphaView && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Current Branch (Auto-detected)
+                    </label>
                   <div className="w-full px-3 py-2 bg-gray-100 dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-md text-gray-900 dark:text-gray-200">
                     {currentBranch || 'Detecting...'}
                   </div>
                   <p className="mt-1 text-xs text-gray-600 dark:text-gray-500">
                     This is the currently checked out branch in the project directory
                   </p>
-                </div>
+                  </div>
+                )}
 
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Worktree Folder
-                  </label>
+                {!alphaView && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Worktree Folder
+                    </label>
                   <div className="flex items-center gap-2">
                     <input
                       type="text"
@@ -263,12 +295,14 @@ export default function ProjectSettings({ project, isOpen, onClose, onUpdate, on
                     The folder where git worktrees will be created. Can be a relative path (e.g., "worktrees") or an absolute path.
                     Leave empty to use the default "worktrees" folder inside the project directory.
                   </p>
-                </div>
+                  </div>
+                )}
               </div>
             </div>
 
-            {/* Project-Specific Settings */}
-            <div>
+            {/* Project-Specific Settings - Hidden in Alpha View */}
+            {!alphaView && (
+              <div>
               <h3 className="text-lg font-medium text-gray-900 dark:text-gray-200 mb-4">Project-Specific Settings</h3>
               <div className="space-y-4">
                 <div>
@@ -354,7 +388,8 @@ export default function ProjectSettings({ project, isOpen, onClose, onUpdate, on
                   </p>
                 </div>
               </div>
-            </div>
+              </div>
+            )}
 
             {/* Avatar Section - Only for Alpha Projects */}
             {project.path.includes('/alphas/') && (
@@ -412,8 +447,9 @@ export default function ProjectSettings({ project, isOpen, onClose, onUpdate, on
               </div>
             )}
 
-            {/* Danger Zone */}
-            <div className="border-t border-gray-200 dark:border-gray-700 pt-6">
+            {/* Danger Zone - Hidden in Alpha View */}
+            {!alphaView && (
+              <div className="border-t border-gray-200 dark:border-gray-700 pt-6">
               <h3 className="text-lg font-medium text-red-600 dark:text-red-400 mb-4">Danger Zone</h3>
               {!showDeleteConfirm ? (
                 <button
@@ -444,7 +480,8 @@ export default function ProjectSettings({ project, isOpen, onClose, onUpdate, on
                   </div>
                 </div>
               )}
-            </div>
+              </div>
+            )}
           </div>
         </div>
 

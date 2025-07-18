@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { ChevronRight, ChevronDown, Folder as FolderIcon, FolderOpen, Plus, Settings, GripVertical } from 'lucide-react';
+import { ChevronRight, ChevronDown, Folder as FolderIcon, FolderOpen, Plus, Settings, GripVertical, Brain } from 'lucide-react';
 import { useSessionStore } from '../stores/sessionStore';
 import { useErrorStore } from '../stores/errorStore';
 import { SessionListItem } from './SessionListItem';
@@ -1106,7 +1106,7 @@ export function DraggableProjectTreeView() {
               onClick={() => setShowAddAlphaDialog(true)}
               className="w-full mt-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 flex items-center justify-center space-x-2"
             >
-              <Plus className="w-4 h-4" />
+              <Brain className="w-4 h-4" />
               <span>Create Alpha</span>
             </button>
           </>
@@ -1158,7 +1158,9 @@ export function DraggableProjectTreeView() {
                   className="flex items-center space-x-2 flex-1 min-w-0"
                   onClick={() => handleProjectClick(project)}
                 >
-                  {isExpanded ? (
+                  {project.alpha_view ? (
+                    <Brain className="w-4 h-4 text-purple-600 dark:text-purple-400 flex-shrink-0" />
+                  ) : isExpanded ? (
                     <FolderOpen className="w-4 h-4 text-blue-600 dark:text-blue-400 flex-shrink-0" />
                   ) : (
                     <FolderIcon className="w-4 h-4 text-gray-600 dark:text-gray-400 flex-shrink-0" />
@@ -1176,7 +1178,7 @@ export function DraggableProjectTreeView() {
                   className="flex items-center gap-1 px-2 py-1 text-xs font-medium text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600 rounded transition-colors opacity-100"
                 >
                   <Plus className="w-3 h-3" />
-                  <span>New Session</span>
+                  <span>{project.alpha_view ? 'New Conversation' : 'New Session'}</span>
                 </button>
                 
                 <button
@@ -1383,7 +1385,7 @@ export function DraggableProjectTreeView() {
               onClick={() => setShowAddAlphaDialog(true)}
               className="w-full mt-1 px-2 py-1.5 text-sm text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-200 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded transition-colors flex items-center justify-center space-x-2"
             >
-              <Plus className="w-4 h-4" />
+              <Brain className="w-4 h-4" />
               <span>Create Alpha</span>
             </button>
           </>
@@ -1551,7 +1553,10 @@ export function DraggableProjectTreeView() {
       {showAddAlphaDialog && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-96 shadow-xl border border-gray-200 dark:border-gray-700">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-200 mb-4">Create Alpha Project</h3>
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-200 mb-4 flex items-center space-x-2">
+              <Brain className="w-5 h-5 text-purple-600 dark:text-purple-400" />
+              <span>Create Alpha Project</span>
+            </h3>
             
             <div className="space-y-4">
               <div>
@@ -1590,9 +1595,10 @@ export function DraggableProjectTreeView() {
               <button
                 onClick={handleCreateAlpha}
                 disabled={!newAlphaName.trim()}
-                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center space-x-2"
               >
-                Create Alpha
+                <Brain className="w-4 h-4" />
+                <span>Create Alpha</span>
               </button>
             </div>
           </div>
