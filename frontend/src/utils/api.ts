@@ -276,6 +276,16 @@ export class API {
       if (!isElectron()) throw new Error('Electron API not available');
       return window.electronAPI.projects.listBranches(projectId);
     },
+
+    async generateAvatar(projectId: string) {
+      if (!isElectron()) throw new Error('Electron API not available');
+      return window.electronAPI.projects.generateAvatar(projectId);
+    },
+
+    async getAvatar(projectId: string) {
+      if (!isElectron()) throw new Error('Electron API not available');
+      return window.electronAPI.projects.getAvatar(projectId);
+    },
   };
 
   // Folders

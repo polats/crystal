@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
-import { X, Save, Trash2 } from 'lucide-react';
+import { X, Save, Trash2, Image as ImageIcon, RefreshCw, User } from 'lucide-react';
 import { API } from '../utils/api';
+import { useErrorStore } from '../stores/errorStore';
 import type { Project } from '../types/project';
 
 interface ProjectSettingsProps {
@@ -23,6 +24,10 @@ export default function ProjectSettings({ project, isOpen, onClose, onUpdate, on
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [avatarData, setAvatarData] = useState<string | null>(null);
+  const [isGeneratingAvatar, setIsGeneratingAvatar] = useState(false);
+  const [isLoadingAvatar, setIsLoadingAvatar] = useState(false);
+  const { showError } = useErrorStore();
 
   useEffect(() => {
     if (isOpen && project) {
@@ -42,8 +47,57 @@ export default function ProjectSettings({ project, isOpen, onClose, onUpdate, on
       setOpenIdeCommand(project.open_ide_command || '');
       setWorktreeFolder(project.worktree_folder || '');
       setError(null);
+      
+      // Load avatar for alpha projects
+      if (project.path.includes('/alphas/')) {
+        loadAvatar();
+      } else {
+        setAvatarData(null);
+      }
     }
   }, [isOpen, project]);
+
+  const loadAvatar = async () => {
+    setIsLoadingAvatar(true);
+    try {
+      const response = await API.projects.getAvatar(project.id.toString());
+      if (response.success) {
+        setAvatarData(response.data);
+      } else {
+        setAvatarData(null);
+      }
+    } catch (error) {
+      console.error('Failed to load avatar:', error);
+      setAvatarData(null);
+    } finally {
+      setIsLoadingAvatar(false);
+    }
+  };
+
+  const generateAvatar = async () => {
+    setIsGeneratingAvatar(true);
+    try {
+      const response = await API.projects.generateAvatar(project.id.toString());
+      if (response.success) {
+        // Reload the avatar after generation
+        await loadAvatar();
+      } else {
+        showError({
+          title: 'Avatar Generation Failed',
+          error: response.error || 'Failed to generate avatar',
+          details: response.details
+        });
+      }
+    } catch (error: any) {
+      showError({
+        title: 'Avatar Generation Failed',
+        error: error.message || 'Failed to generate avatar',
+        details: error.toString()
+      });
+    } finally {
+      setIsGeneratingAvatar(false);
+    }
+  };
 
   const handleSave = async () => {
     setIsSaving(true);
@@ -301,6 +355,62 @@ export default function ProjectSettings({ project, isOpen, onClose, onUpdate, on
                 </div>
               </div>
             </div>
+
+            {/* Avatar Section - Only for Alpha Projects */}
+            {project.path.includes('/alphas/') && (
+              <div>
+                <h3 className="text-lg font-medium text-gray-900 dark:text-gray-200 mb-4">Project Avatar</h3>
+                <div className="space-y-4">
+                  <div className="flex items-start space-x-4">
+                    <div className="flex-shrink-0">
+                      {isLoadingAvatar ? (
+                        <div className="w-32 h-32 bg-gray-200 dark:bg-gray-700 rounded-lg flex items-center justify-center">
+                          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+                        </div>
+                      ) : avatarData ? (
+                        <img
+                          src={`data:image/png;base64,${avatarData}`}
+                          alt={`${project.name} avatar`}
+                          className="w-32 h-32 rounded-lg object-cover border border-gray-300 dark:border-gray-600"
+                        />
+                      ) : (
+                        <div className="w-32 h-32 bg-gray-200 dark:bg-gray-700 rounded-lg flex items-center justify-center border border-gray-300 dark:border-gray-600">
+                          <User className="w-12 h-12 text-gray-400" />
+                        </div>
+                      )}
+                    </div>
+                    
+                    <div className="flex-1">
+                      <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+                        {avatarData 
+                          ? 'Avatar found for this alpha project. You can regenerate it using the button below.'
+                          : 'No avatar found for this alpha project. Generate one using AI image generation.'
+                        }
+                      </p>
+                      
+                      <button
+                        onClick={generateAvatar}
+                        disabled={isGeneratingAvatar}
+                        className={`flex items-center space-x-2 px-4 py-2 rounded-md transition-colors ${
+                          isGeneratingAvatar
+                            ? 'bg-gray-300 dark:bg-gray-600 text-gray-500 dark:text-gray-400 cursor-not-allowed'
+                            : 'bg-blue-600 hover:bg-blue-700 text-white'
+                        }`}
+                      >
+                        <RefreshCw className={`w-4 h-4 ${isGeneratingAvatar ? 'animate-spin' : ''}`} />
+                        <span>{isGeneratingAvatar ? 'Generating...' : avatarData ? 'Regenerate Avatar' : 'Generate Avatar'}</span>
+                      </button>
+                      
+                      {avatarData && (
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+                          Avatar saved as pfp.png in project folder
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Danger Zone */}
             <div className="border-t border-gray-200 dark:border-gray-700 pt-6">

@@ -18,6 +18,7 @@ export class ConfigManager extends EventEmitter {
       gitRepoPath: defaultGitPath || os.homedir(),
       verbose: false,
       anthropicApiKey: undefined,
+      openaiApiKey: undefined,
       systemPromptAppend: undefined,
       runScript: undefined,
       defaultPermissionMode: 'ignore',
@@ -73,6 +74,10 @@ export class ConfigManager extends EventEmitter {
 
   getAnthropicApiKey(): string | undefined {
     return this.config.anthropicApiKey;
+  }
+
+  getOpenAIApiKey(): string | undefined {
+    return this.config.openaiApiKey;
   }
 
   getSystemPromptAppend(): string | undefined {

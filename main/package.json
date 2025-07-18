@@ -22,7 +22,8 @@
     "dotenv": "^16.4.7",
     "electron-store": "^10.0.0",
     "electron-updater": "^6.6.2",
-    "glob": "^11.0.0"
+    "glob": "^11.0.0",
+    "openai": "^5.1.1"
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.13",

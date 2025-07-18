@@ -2,6 +2,7 @@ export interface AppConfig {
   gitRepoPath: string;
   verbose?: boolean;
   anthropicApiKey?: string;
+  openaiApiKey?: string;
   systemPromptAppend?: string;
   runScript?: string[];
   claudeExecutablePath?: string;

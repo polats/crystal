@@ -15,6 +15,7 @@ export function Settings({ isOpen, onClose }: SettingsProps) {
   const [_config, setConfig] = useState<AppConfig | null>(null);
   const [verbose, setVerbose] = useState(false);
   const [anthropicApiKey, setAnthropicApiKey] = useState('');
+  const [openaiApiKey, setOpenaiApiKey] = useState('');
   const [globalSystemPrompt, setGlobalSystemPrompt] = useState('');
   const [claudeExecutablePath, setClaudeExecutablePath] = useState('');
   const [defaultPermissionMode, setDefaultPermissionMode] = useState<'approve' | 'ignore'>('ignore');
@@ -38,6 +39,7 @@ export function Settings({ isOpen, onClose }: SettingsProps) {
       setConfig(data);
       setVerbose(data.verbose || false);
       setAnthropicApiKey(data.anthropicApiKey || '');
+      setOpenaiApiKey(data.openaiApiKey || '');
       setGlobalSystemPrompt(data.systemPromptAppend || '');
       setClaudeExecutablePath(data.claudeExecutablePath || '');
       setDefaultPermissionMode(data.defaultPermissionMode || 'ignore');
@@ -46,6 +48,7 @@ export function Settings({ isOpen, onClose }: SettingsProps) {
       setError('Failed to load configuration');
     }
   };
+
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -56,6 +59,7 @@ export function Settings({ isOpen, onClose }: SettingsProps) {
       const response = await API.config.update({ 
         verbose, 
         anthropicApiKey, 
+        openaiApiKey,
         systemPromptAppend: globalSystemPrompt, 
         claudeExecutablePath,
         defaultPermissionMode,
@@ -189,6 +193,23 @@ export function Settings({ isOpen, onClose }: SettingsProps) {
             />
             <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
               Used for auto-generating session names with AI (NOT for Claude Code itself). If not provided, fallback names will be used.
+            </p>
+          </div>
+
+          <div>
+            <label htmlFor="openaiApiKey" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              OpenAI API Key (Optional)
+            </label>
+            <input
+              id="openaiApiKey"
+              type="password"
+              value={openaiApiKey}
+              onChange={(e) => setOpenaiApiKey(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 dark:text-gray-100 bg-white dark:bg-gray-700"
+              placeholder="sk-proj-..."
+            />
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+              Used for generating images via DALL-E integration within Claude Code sessions.
             </p>
           </div>
 

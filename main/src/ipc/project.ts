@@ -146,6 +146,11 @@ export function registerProjectHandlers(ipcMain: IpcMain, services: AppServices)
                 destFileName = 'CLAUDE.md';
               }
               
+              // Skip avatar-prompt.md during initial copy - we'll copy it separately
+              if (file === 'avatar-prompt.md') {
+                continue;
+              }
+              
               const destPath = path.join(projectData.path, destFileName);
               
               if (file === 'README.md') {
@@ -160,6 +165,16 @@ export function registerProjectHandlers(ipcMain: IpcMain, services: AppServices)
                 console.log(`[Main] Copied ${file} as ${destFileName}`);
               }
             }
+            
+            // Copy avatar-prompt.md separately so users can customize it
+            const avatarPromptSource = path.join(templatesDir, 'avatar-prompt.md');
+            const avatarPromptDest = path.join(projectData.path, 'avatar-prompt.md');
+            if (existsSync(avatarPromptSource)) {
+              copyFileSync(avatarPromptSource, avatarPromptDest);
+              console.log('[Main] Copied avatar-prompt.md for user customization');
+            }
+            
+            // Avatar generation is now only handled from project settings, not during creation
           } else {
             console.log('[Main] Templates directory not found at:', templatesDir);
           }
@@ -349,4 +364,163 @@ export function registerProjectHandlers(ipcMain: IpcMain, services: AppServices)
       return { success: false, error: 'Failed to list branches' };
     }
   });
+
+  ipcMain.handle('projects:generate-avatar', async (_event, projectId: string) => {
+    try {
+      const project = databaseService.getProject(parseInt(projectId));
+      if (!project) {
+        return { success: false, error: 'Project not found' };
+      }
+
+      // Check if this is an alpha project
+      if (!project.path.includes('/alphas/')) {
+        return { success: false, error: 'Avatar generation is only available for alpha projects' };
+      }
+
+      // Get the app directory (where templates folder is located)
+      const appDir = app.isPackaged 
+        ? require('path').dirname(app.getPath('exe'))
+        : process.cwd();
+      
+      const templatesDir = require('path').join(appDir, 'templates');
+      
+      await generateAvatarImage(project.path, templatesDir, services);
+      return { success: true };
+    } catch (error) {
+      console.error('[Main] Failed to generate avatar:', error);
+      return { success: false, error: error instanceof Error ? error.message : 'Failed to generate avatar' };
+    }
+  });
+
+  ipcMain.handle('projects:get-avatar', async (_event, projectId: string) => {
+    try {
+      const project = databaseService.getProject(parseInt(projectId));
+      if (!project) {
+        return { success: false, error: 'Project not found' };
+      }
+
+      const avatarPath = require('path').join(project.path, 'pfp.png');
+      if (require('fs').existsSync(avatarPath)) {
+        const avatarData = require('fs').readFileSync(avatarPath);
+        return { success: true, data: avatarData.toString('base64') };
+      } else {
+        return { success: false, error: 'Avatar not found' };
+      }
+    } catch (error) {
+      console.error('[Main] Failed to get avatar:', error);
+      return { success: false, error: error instanceof Error ? error.message : 'Failed to get avatar' };
+    }
+  });
+}
+
+// Helper function to generate avatar image for alpha projects
+async function generateAvatarImage(projectPath: string, templatesDir: string, services: AppServices) {
+  try {
+    const { readFileSync, writeFileSync } = require('fs');
+    const path = require('path');
+    const OpenAI = require('openai').default;
+    
+    // Get OpenAI API key from config
+    const openaiApiKey = services.configManager.getOpenAIApiKey();
+    if (!openaiApiKey) {
+      console.log('[Main] No OpenAI API key configured, skipping avatar generation');
+      return;
+    }
+    
+    // Read the avatar prompt from the project's local copy (allows user customization)
+    const avatarPromptPath = path.join(projectPath, 'avatar-prompt.md');
+    let avatarPrompt: string;
+    try {
+      avatarPrompt = readFileSync(avatarPromptPath, 'utf-8').trim();
+      console.log('[Main] Using project-specific avatar prompt from:', avatarPromptPath);
+    } catch (error) {
+      // Fallback to templates directory if project copy doesn't exist
+      const fallbackPath = path.join(templatesDir, 'avatar-prompt.md');
+      try {
+        avatarPrompt = readFileSync(fallbackPath, 'utf-8').trim();
+        console.log('[Main] Using fallback avatar prompt from templates:', fallbackPath);
+      } catch (fallbackError) {
+        console.log('[Main] avatar-prompt.md not found in project or templates, skipping avatar generation');
+        return;
+      }
+    }
+    
+    console.log('[Main] Generating avatar image with prompt:', avatarPrompt);
+    
+    // Initialize OpenAI client
+    const openai = new OpenAI({
+      apiKey: openaiApiKey,
+    });
+    
+    // Send initial loading notification
+    const projectName = path.basename(projectPath);
+    const mainWindow = services.getMainWindow();
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('avatar-generation-progress', {
+        projectName,
+        status: 'generating',
+        progress: 0,
+        message: 'Starting avatar generation...'
+      });
+    }
+    
+    // Generate image using responses API with DALL-E 3 for cost efficiency
+    const response = await openai.images.generate({
+      prompt: avatarPrompt,
+      model: "dall-e-2",
+      n: 1,
+      size: "512x512",
+      response_format: "b64_json"
+    });
+    
+    // Send progress update
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('avatar-generation-progress', {
+        projectName,
+        status: 'generating',
+        progress: 50,
+        message: 'Processing generated image...'
+      });
+    }
+    
+    const imageData = response.data[0];
+    if (!imageData.b64_json) {
+      throw new Error('No image data received from OpenAI');
+    }
+    
+    const finalImageBuffer = Buffer.from(imageData.b64_json, 'base64');
+    console.log('[Main] Image generated successfully');
+    
+    // Save image as pfp.png in the project directory
+    const imagePath = path.join(projectPath, 'pfp.png');
+    writeFileSync(imagePath, finalImageBuffer);
+    console.log('[Main] Avatar image saved to:', imagePath);
+    
+    // Send completion notification
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('avatar-generation-progress', {
+        projectName,
+        status: 'complete',
+        progress: 100,
+        message: 'Avatar generated successfully!'
+      });
+    }
+    
+  } catch (error) {
+    console.error('[Main] Failed to generate avatar image:', error);
+    
+    // Send error notification
+    const projectName = require('path').basename(projectPath);
+    const mainWindow = services.getMainWindow();
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('avatar-generation-progress', {
+        projectName,
+        status: 'error',
+        progress: 0,
+        message: `Failed to generate avatar: ${(error as Error).message}`
+      });
+    }
+    
+    // Don't fail project creation if image generation fails
+  }
 } 

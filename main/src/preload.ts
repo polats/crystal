@@ -111,6 +111,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     detectBranch: (path: string): Promise<IPCResponse> => ipcRenderer.invoke('projects:detect-branch', path),
     reorder: (projectOrders: Array<{ id: number; displayOrder: number }>): Promise<IPCResponse> => ipcRenderer.invoke('projects:reorder', projectOrders),
     listBranches: (projectId: string): Promise<IPCResponse> => ipcRenderer.invoke('projects:list-branches', projectId),
+    generateAvatar: (projectId: string): Promise<IPCResponse> => ipcRenderer.invoke('projects:generate-avatar', projectId),
+    getAvatar: (projectId: string): Promise<IPCResponse> => ipcRenderer.invoke('projects:get-avatar', projectId),
   },
 
   // Git operations
@@ -291,6 +293,17 @@ contextBridge.exposeInMainWorld('electronAPI', {
       const wrappedCallback = (_event: any, data: any) => callback(data);
       ipcRenderer.on('zombie-processes-detected', wrappedCallback);
       return () => ipcRenderer.removeListener('zombie-processes-detected', wrappedCallback);
+    },
+
+    onAvatarGenerationProgress: (callback: (data: {
+      projectName: string;
+      status: 'generating' | 'complete' | 'error';
+      progress: number;
+      message: string;
+    }) => void) => {
+      const wrappedCallback = (_event: any, data: any) => callback(data);
+      ipcRenderer.on('avatar-generation-progress', wrappedCallback);
+      return () => ipcRenderer.removeListener('avatar-generation-progress', wrappedCallback);
     },
   },
 
