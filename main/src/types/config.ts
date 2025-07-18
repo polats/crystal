@@ -19,6 +19,8 @@ export interface AppConfig {
   stravuServerUrl?: string;
   // Theme preference
   theme?: 'light' | 'dark';
+  // Default directory for alpha projects
+  alphasDirectory?: string;
 }
 
 export interface UpdateConfigRequest {
@@ -33,4 +35,5 @@ export interface UpdateConfigRequest {
   stravuApiKey?: string;
   stravuServerUrl?: string;
   theme?: 'light' | 'dark';
+  alphasDirectory?: string;
 }

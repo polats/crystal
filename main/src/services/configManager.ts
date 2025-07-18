@@ -24,7 +24,8 @@ export class ConfigManager extends EventEmitter {
       defaultPermissionMode: 'ignore',
       defaultModel: 'claude-sonnet-4-20250514',
       stravuApiKey: undefined,
-      stravuServerUrl: 'https://api.stravu.com'
+      stravuServerUrl: 'https://api.stravu.com',
+      alphasDirectory: path.join(os.homedir(), 'alphas')
     };
   }
 
@@ -98,5 +99,9 @@ export class ConfigManager extends EventEmitter {
 
   getDefaultModel(): string {
     return this.config.defaultModel || 'claude-sonnet-4-20250514';
+  }
+
+  getAlphasDirectory(): string {
+    return this.config.alphasDirectory || path.join(os.homedir(), 'alphas');
   }
 }

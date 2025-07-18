@@ -11,4 +11,5 @@ export interface AppConfig {
   stravuApiKey?: string;
   stravuServerUrl?: string;
   theme?: 'light' | 'dark';
+  alphasDirectory?: string;
 }

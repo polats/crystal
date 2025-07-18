@@ -1,4 +1,5 @@
 import { IpcMain } from 'electron';
+import os from 'os';
 import type { AppServices } from './types';
 
 export function registerProjectHandlers(ipcMain: IpcMain, services: AppServices): void {
@@ -34,9 +35,13 @@ export function registerProjectHandlers(ipcMain: IpcMain, services: AppServices)
       const { mkdirSync, existsSync } = require('fs');
       const { execSync: nodeExecSync } = require('child_process');
 
-      // Resolve the absolute path
+      // Resolve the absolute path (expand ~ first if needed)
       const { resolve } = require('path');
-      const absolutePath = resolve(projectData.path);
+      let expandedPath = projectData.path;
+      if (projectData.path.startsWith('~')) {
+        expandedPath = projectData.path.replace('~', os.homedir());
+      }
+      const absolutePath = resolve(expandedPath);
       console.log('[Main] Resolved absolute path:', absolutePath);
       
       // Create directory if it doesn't exist
@@ -85,7 +90,7 @@ export function registerProjectHandlers(ipcMain: IpcMain, services: AppServices)
           console.log(`[Main] Created and checked out branch: ${branchName}`);
 
           // For alpha projects, copy template files before initial commit
-          const isAlphaProjectForGit = projectData.path.includes('/alphas/');
+          const isAlphaProjectForGit = projectData.isAlpha || false;
           if (isAlphaProjectForGit) {
             console.log('[Main] Alpha project detected, copying template files before initial commit...');
             try {
@@ -182,7 +187,7 @@ export function registerProjectHandlers(ipcMain: IpcMain, services: AppServices)
 
 
       // Check if this is an alpha project and set alpha_view to true by default
-      const isAlphaProjectForCreation = projectData.path.includes('/alphas/');
+      const isAlphaProjectForCreation = projectData.isAlpha || false;
       
       const project = databaseService.createProject(
         projectData.name,
@@ -377,7 +382,7 @@ export function registerProjectHandlers(ipcMain: IpcMain, services: AppServices)
       }
 
       // Check if this is an alpha project
-      if (!project.path.includes('/alphas/')) {
+      if (!project.alpha_view) {
         return { success: false, error: 'Avatar generation is only available for alpha projects' };
       }
 

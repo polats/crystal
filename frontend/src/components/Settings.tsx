@@ -20,6 +20,7 @@ export function Settings({ isOpen, onClose }: SettingsProps) {
   const [claudeExecutablePath, setClaudeExecutablePath] = useState('');
   const [defaultPermissionMode, setDefaultPermissionMode] = useState<'approve' | 'ignore'>('ignore');
   const [autoCheckUpdates, setAutoCheckUpdates] = useState(true);
+  const [alphasDirectory, setAlphasDirectory] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'general' | 'notifications' | 'stravu'>('general');
@@ -44,6 +45,7 @@ export function Settings({ isOpen, onClose }: SettingsProps) {
       setClaudeExecutablePath(data.claudeExecutablePath || '');
       setDefaultPermissionMode(data.defaultPermissionMode || 'ignore');
       setAutoCheckUpdates(data.autoCheckUpdates !== false); // Default to true
+      setAlphasDirectory(data.alphasDirectory || '');
     } catch (err) {
       setError('Failed to load configuration');
     }
@@ -63,7 +65,8 @@ export function Settings({ isOpen, onClose }: SettingsProps) {
         systemPromptAppend: globalSystemPrompt, 
         claudeExecutablePath,
         defaultPermissionMode,
-        autoCheckUpdates
+        autoCheckUpdates,
+        alphasDirectory
       });
 
       if (!response.success) {
@@ -306,6 +309,41 @@ export function Settings({ isOpen, onClose }: SettingsProps) {
             </div>
             <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
               Full path to the claude executable. Leave empty to use the claude command from PATH. This is useful if Claude is installed in a non-standard location.
+            </p>
+          </div>
+
+          <div>
+            <label htmlFor="alphasDirectory" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Alpha Projects Directory
+            </label>
+            <div className="flex gap-2">
+              <input
+                id="alphasDirectory"
+                type="text"
+                value={alphasDirectory}
+                onChange={(e) => setAlphasDirectory(e.target.value)}
+                className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 dark:text-gray-100 bg-white dark:bg-gray-700"
+                placeholder="~/alphas"
+              />
+              <button
+                type="button"
+                onClick={async () => {
+                  const result = await API.dialog.openFile({
+                    title: 'Select Alpha Projects Directory',
+                    buttonLabel: 'Select',
+                    properties: ['openDirectory']
+                  });
+                  if (result.success && result.data) {
+                    setAlphasDirectory(result.data);
+                  }
+                }}
+                className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-200 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                Browse
+              </button>
+            </div>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+              Default directory where alpha projects will be created. Leave empty to use ~/alphas.
             </p>
           </div>
 

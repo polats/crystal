@@ -51,7 +51,7 @@ export default function ProjectSettings({ project, isOpen, onClose, onUpdate, on
       setError(null);
       
       // Load avatar for alpha projects
-      if (project.path.includes('/alphas/')) {
+      if (project.alpha_view) {
         loadAvatar();
       } else {
         setAvatarData(null);
@@ -172,7 +172,7 @@ export default function ProjectSettings({ project, isOpen, onClose, onUpdate, on
 
           <div className="space-y-6">
             {/* View Mode Toggle - Only for Alpha Projects */}
-            {project.path.includes('/alphas/') && (
+            {project.alpha_view && (
               <div className="flex items-center justify-between p-4 bg-gray-100 dark:bg-gray-900 rounded-lg border border-gray-300 dark:border-gray-700">
                 <div>
                   <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Alpha View</label>
@@ -392,7 +392,7 @@ export default function ProjectSettings({ project, isOpen, onClose, onUpdate, on
             )}
 
             {/* Avatar Section - Only for Alpha Projects */}
-            {project.path.includes('/alphas/') && (
+            {project.alpha_view && (
               <div>
                 <h3 className="text-lg font-medium text-gray-900 dark:text-gray-200 mb-4">Project Avatar</h3>
                 <div className="space-y-4">

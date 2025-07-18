@@ -596,25 +596,29 @@ export function DraggableProjectTreeView() {
     if (!newAlphaName) return;
 
     try {
-      // Get the current working directory and create absolute path
-      const cwdResponse = await API.system.getCurrentWorkingDirectory();
-      if (!cwdResponse.success) {
+      // Get the alphas directory from config
+      const configResponse = await API.config.get();
+      if (!configResponse.success) {
         showError({
-          title: 'Failed to Get Current Directory',
-          error: cwdResponse.error || 'Could not determine current working directory.',
-          details: cwdResponse.details
+          title: 'Failed to Get Configuration',
+          error: configResponse.error || 'Could not load configuration.',
+          details: configResponse.details
         });
         return;
       }
 
-      // Create the project in {cwd}/alphas/{name} (absolute path)
-      const alphaPath = `${cwdResponse.data}/alphas/${newAlphaName}`;
+      // Use alphas directory from config, or default to ~/alphas
+      const alphasDirectory = configResponse.data?.alphasDirectory || '~/alphas';
+      
+      // Let the backend handle path expansion - just pass the directory and project name
+      const alphaPath = `${alphasDirectory}/${newAlphaName}`;
       
       const alphaProject = {
         name: newAlphaName,
         path: alphaPath,
         buildScript: '',
-        runScript: ''
+        runScript: '',
+        isAlpha: true
       };
 
       const response = await API.projects.create(alphaProject);
@@ -1578,7 +1582,7 @@ export function DraggableProjectTreeView() {
                   }}
                 />
                 <p className="text-xs text-gray-500 mt-1">
-                  This will create a new project at ./alphas/{newAlphaName || 'project-name'}
+                  This will create a new project in your alphas directory: ~/alphas/{newAlphaName || 'project-name'}
                 </p>
               </div>
             </div>
