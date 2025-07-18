@@ -337,7 +337,9 @@ async function initializeServices() {
   // Initialize the active project's worktree directory if one exists
   const activeProject = sessionManager.getActiveProject();
   if (activeProject) {
-    await worktreeManager.initializeProject(activeProject.path);
+    // Use "conversations" folder for alpha projects, otherwise use project's worktree_folder setting
+    const effectiveWorktreeFolder = activeProject.alpha_view ? 'conversations' : activeProject.worktree_folder;
+    await worktreeManager.initializeProject(activeProject.path, effectiveWorktreeFolder);
   }
 
   claudeCodeManager = new ClaudeCodeManager(sessionManager, logger, configManager, permissionIpcPath);

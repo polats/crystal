@@ -10,9 +10,10 @@ interface CreateSessionDialogProps {
   onClose: () => void;
   projectName?: string;
   projectId?: number;
+  isAlphaView?: boolean;
 }
 
-export function CreateSessionDialog({ isOpen, onClose, projectName, projectId }: CreateSessionDialogProps) {
+export function CreateSessionDialog({ isOpen, onClose, projectName, projectId, isAlphaView }: CreateSessionDialogProps) {
   const [formData, setFormData] = useState<CreateSessionRequest>({
     prompt: '',
     worktreeTemplate: '',
@@ -105,11 +106,40 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId }:
     return null;
   };
 
+  const sanitizeSessionName = (name: string): string => {
+    if (!name) return '';
+    
+    return name
+      .trim()
+      .toLowerCase()
+      // Remove invalid git characters
+      .replace(/[~^:?*\[\]\\]/g, '')
+      // Replace spaces and other whitespace with dashes
+      .replace(/\s+/g, '-')
+      // Remove leading/trailing dots and slashes
+      .replace(/^[./]+|[./]+$/g, '')
+      // Replace consecutive dots with single dot
+      .replace(/\.{2,}/g, '.')
+      // Remove any remaining invalid characters
+      .replace(/[^a-z0-9._-]/g, '')
+      // Ensure it doesn't start or end with special chars
+      .replace(/^[._-]+|[._-]+$/g, '')
+      // Ensure it's not empty after cleaning
+      || 'conversation';
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    // For alpha view, auto-generate session name from prompt
+    let sessionName = formData.worktreeTemplate;
+    if (isAlphaView && !sessionName) {
+      // Truncate prompt to 12 chars and sanitize for valid git naming
+      sessionName = sanitizeSessionName(formData.prompt.substring(0, 12));
+    }
+    
     // Check if session name is required
-    if (!hasApiKey && !formData.worktreeTemplate) {
+    if (!hasApiKey && !sessionName && !isAlphaView) {
       showError({
         title: 'Session Name Required',
         error: 'Please provide a session name or add an Anthropic API key in Settings to enable auto-naming.'
@@ -118,7 +148,7 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId }:
     }
     
     // Validate worktree name
-    const validationError = validateWorktreeName(formData.worktreeTemplate || '');
+    const validationError = validateWorktreeName(sessionName || '');
     if (validationError) {
       showError({
         title: 'Invalid Session Name',
@@ -135,6 +165,7 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId }:
       
       const response = await API.sessions.create({
         ...formData,
+        worktreeTemplate: sessionName || formData.worktreeTemplate,
         prompt: finalPrompt,
         projectId,
         autoCommit
@@ -181,7 +212,7 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId }:
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700">
           <h2 className="text-xl font-bold text-gray-900 dark:text-white">
-            Create New Session{projectName && ` in ${projectName}`}
+            {isAlphaView ? 'Create New Conversation' : 'Create New Session'}{projectName && ` in ${projectName}`}
           </h2>
           <button
             onClick={() => {
@@ -213,150 +244,156 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId }:
               isTextarea={true}
               rows={4}
             />
-            <div className="mt-2 space-y-3">
-              <div>
-                <label className="flex items-center gap-2 cursor-pointer group">
-                  <input
-                    type="checkbox"
-                    checked={ultrathink}
-                    onChange={(e) => setUltrathink(e.target.checked)}
-                    className="h-4 w-4 text-blue-600 rounded border-gray-300 dark:border-gray-600 focus:ring-blue-500"
-                  />
-                  <span className="text-sm text-gray-700 dark:text-gray-300">
-                    Enable ultrathink mode
-                  </span>
-                </label>
-                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 ml-6">
-                  Triggers Claude Code to use its maximum thinking token limit. Slower but better for difficult tasks.
-                </p>
+            {!isAlphaView && (
+              <div className="mt-2 space-y-3">
+                <div>
+                  <label className="flex items-center gap-2 cursor-pointer group">
+                    <input
+                      type="checkbox"
+                      checked={ultrathink}
+                      onChange={(e) => setUltrathink(e.target.checked)}
+                      className="h-4 w-4 text-blue-600 rounded border-gray-300 dark:border-gray-600 focus:ring-blue-500"
+                    />
+                    <span className="text-sm text-gray-700 dark:text-gray-300">
+                      Enable ultrathink mode
+                    </span>
+                  </label>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 ml-6">
+                    Triggers Claude Code to use its maximum thinking token limit. Slower but better for difficult tasks.
+                  </p>
+                </div>
+                <div>
+                  <label className="flex items-center gap-2 cursor-pointer group">
+                    <input
+                      type="checkbox"
+                      checked={autoCommit}
+                      onChange={(e) => setAutoCommit(e.target.checked)}
+                      className="h-4 w-4 text-green-600 rounded border-gray-300 dark:border-gray-600 focus:ring-green-500"
+                    />
+                    <span className="text-sm text-gray-700 dark:text-gray-300">
+                      Enable auto-commit
+                    </span>
+                  </label>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 ml-6">
+                    Automatically commit changes after each prompt. Can be toggled later during the session.
+                  </p>
+                </div>
               </div>
-              <div>
-                <label className="flex items-center gap-2 cursor-pointer group">
-                  <input
-                    type="checkbox"
-                    checked={autoCommit}
-                    onChange={(e) => setAutoCommit(e.target.checked)}
-                    className="h-4 w-4 text-green-600 rounded border-gray-300 dark:border-gray-600 focus:ring-green-500"
-                  />
-                  <span className="text-sm text-gray-700 dark:text-gray-300">
-                    Enable auto-commit
-                  </span>
-                </label>
-                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 ml-6">
-                  Automatically commit changes after each prompt. Can be toggled later during the session.
-                </p>
-              </div>
-            </div>
+            )}
           </div>
           
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              AI Model
-            </label>
-            <div className="flex items-center gap-2 mb-2">
-              <Cpu className="w-4 h-4 text-gray-400" />
-              <select
-                value={formData.model || 'claude-sonnet-4-20250514'}
-                onChange={(e) => {
-                  const newModel = e.target.value;
-                  setFormData({ ...formData, model: newModel });
-                  // Don't save as default - always start fresh with Sonnet 4
-                }}
-                className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 dark:text-gray-100 bg-white dark:bg-gray-700"
-              >
-                <option value="claude-sonnet-4-20250514">Sonnet 4 (Balanced - Recommended)</option>
-                <option value="claude-opus-4-20250514">Opus 4 (Maximum Capability)</option>
-                <option value="claude-3-5-haiku-20241022">Haiku 3.5 (Fast & Lightweight)</option>
-              </select>
+          {!isAlphaView && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                AI Model
+              </label>
+              <div className="flex items-center gap-2 mb-2">
+                <Cpu className="w-4 h-4 text-gray-400" />
+                <select
+                  value={formData.model || 'claude-sonnet-4-20250514'}
+                  onChange={(e) => {
+                    const newModel = e.target.value;
+                    setFormData({ ...formData, model: newModel });
+                    // Don't save as default - always start fresh with Sonnet 4
+                  }}
+                  className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 dark:text-gray-100 bg-white dark:bg-gray-700"
+                >
+                  <option value="claude-sonnet-4-20250514">Sonnet 4 (Balanced - Recommended)</option>
+                  <option value="claude-opus-4-20250514">Opus 4 (Maximum Capability)</option>
+                  <option value="claude-3-5-haiku-20241022">Haiku 3.5 (Fast & Lightweight)</option>
+                </select>
+              </div>
+              <div className="space-y-2 text-xs text-gray-500 dark:text-gray-400">
+                <div className="p-2 bg-gray-50 dark:bg-gray-800 rounded-md">
+                  <strong className="text-gray-700 dark:text-gray-300">Sonnet 4:</strong> Best for most coding tasks. Excellent balance of speed and capability.
+                </div>
+                <div className="p-2 bg-gray-50 dark:bg-gray-800 rounded-md">
+                  <strong className="text-gray-700 dark:text-gray-300">Opus 4:</strong> Use for complex architecture, large refactors, and challenging problems. Slower but more thorough.
+                </div>
+                <div className="p-2 bg-gray-50 dark:bg-gray-800 rounded-md">
+                  <strong className="text-gray-700 dark:text-gray-300">Haiku 3.5:</strong> Fast and cost-effective for simple tasks and repetitive work.
+                </div>
+                <div className="p-2 bg-amber-50 dark:bg-amber-900/20 rounded-md border border-amber-200 dark:border-amber-700">
+                  <span className="text-amber-700 dark:text-amber-300">⚠️ Larger models will hit limits faster</span>
+                </div>
+              </div>
             </div>
-            <div className="space-y-2 text-xs text-gray-500 dark:text-gray-400">
-              <div className="p-2 bg-gray-50 dark:bg-gray-800 rounded-md">
-                <strong className="text-gray-700 dark:text-gray-300">Sonnet 4:</strong> Best for most coding tasks. Excellent balance of speed and capability.
-              </div>
-              <div className="p-2 bg-gray-50 dark:bg-gray-800 rounded-md">
-                <strong className="text-gray-700 dark:text-gray-300">Opus 4:</strong> Use for complex architecture, large refactors, and challenging problems. Slower but more thorough.
-              </div>
-              <div className="p-2 bg-gray-50 dark:bg-gray-800 rounded-md">
-                <strong className="text-gray-700 dark:text-gray-300">Haiku 3.5:</strong> Fast and cost-effective for simple tasks and repetitive work.
-              </div>
-              <div className="p-2 bg-amber-50 dark:bg-amber-900/20 rounded-md border border-amber-200 dark:border-amber-700">
-                <span className="text-amber-700 dark:text-amber-300">⚠️ Larger models will hit limits faster</span>
-              </div>
-            </div>
-          </div>
+          )}
           
-          <div>
-            <label htmlFor="worktreeTemplate" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Session Name {hasApiKey ? '(Optional)' : '(Required)'}
-            </label>
-            <div className="flex gap-2">
-              <input
-                id="worktreeTemplate"
-                type="text"
-                value={formData.worktreeTemplate}
-                onChange={(e) => {
-                  const value = e.target.value;
-                  setFormData({ ...formData, worktreeTemplate: value });
-                  // Real-time validation
-                  const error = validateWorktreeName(value);
-                  setWorktreeError(error);
-                }}
-                className={`flex-1 px-3 py-2 border rounded-md focus:outline-none focus:ring-2 text-gray-900 dark:text-gray-100 bg-white dark:bg-gray-700 placeholder-gray-500 dark:placeholder-gray-400 ${
-                  worktreeError 
-                    ? 'border-red-400 focus:ring-red-500' 
-                    : 'border-gray-300 dark:border-gray-600 focus:ring-blue-500'
-                }`}
-                placeholder={hasApiKey ? "Leave empty for AI-generated name" : "Enter a name for your session"}
-                disabled={isGeneratingName}
-              />
-              {hasApiKey && formData.prompt.trim() && (
-                <button
-                  type="button"
-                  onClick={async () => {
-                    setIsGeneratingName(true);
-                    try {
-                      const response = await API.sessions.generateName(formData.prompt);
-                      if (response.success && response.data) {
-                        setFormData({ ...formData, worktreeTemplate: response.data });
-                        setWorktreeError(null);
-                      } else {
+          {!isAlphaView && (
+            <div>
+              <label htmlFor="worktreeTemplate" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Session Name {hasApiKey ? '(Optional)' : '(Required)'}
+              </label>
+              <div className="flex gap-2">
+                <input
+                  id="worktreeTemplate"
+                  type="text"
+                  value={formData.worktreeTemplate}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    setFormData({ ...formData, worktreeTemplate: value });
+                    // Real-time validation
+                    const error = validateWorktreeName(value);
+                    setWorktreeError(error);
+                  }}
+                  className={`flex-1 px-3 py-2 border rounded-md focus:outline-none focus:ring-2 text-gray-900 dark:text-gray-100 bg-white dark:bg-gray-700 placeholder-gray-500 dark:placeholder-gray-400 ${
+                    worktreeError 
+                      ? 'border-red-400 focus:ring-red-500' 
+                      : 'border-gray-300 dark:border-gray-600 focus:ring-blue-500'
+                  }`}
+                  placeholder={hasApiKey ? "Leave empty for AI-generated name" : "Enter a name for your session"}
+                  disabled={isGeneratingName}
+                />
+                {hasApiKey && formData.prompt.trim() && (
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      setIsGeneratingName(true);
+                      try {
+                        const response = await API.sessions.generateName(formData.prompt);
+                        if (response.success && response.data) {
+                          setFormData({ ...formData, worktreeTemplate: response.data });
+                          setWorktreeError(null);
+                        } else {
+                          showError({
+                            title: 'Failed to Generate Name',
+                            error: response.error || 'Could not generate session name'
+                          });
+                        }
+                      } catch (error) {
                         showError({
                           title: 'Failed to Generate Name',
-                          error: response.error || 'Could not generate session name'
+                          error: 'An error occurred while generating the name'
                         });
+                      } finally {
+                        setIsGeneratingName(false);
                       }
-                    } catch (error) {
-                      showError({
-                        title: 'Failed to Generate Name',
-                        error: 'An error occurred while generating the name'
-                      });
-                    } finally {
-                      setIsGeneratingName(false);
-                    }
-                  }}
-                  className="px-3 py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-md hover:bg-gray-200 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 border border-gray-300 dark:border-gray-600"
-                  disabled={isGeneratingName || !formData.prompt.trim()}
-                  title="Generate name from prompt"
-                >
-                  <Sparkles className="w-4 h-4" />
-                  {isGeneratingName ? 'Generating...' : 'Generate'}
-                </button>
+                    }}
+                    className="px-3 py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-md hover:bg-gray-200 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 border border-gray-300 dark:border-gray-600"
+                    disabled={isGeneratingName || !formData.prompt.trim()}
+                    title="Generate name from prompt"
+                  >
+                    <Sparkles className="w-4 h-4" />
+                    {isGeneratingName ? 'Generating...' : 'Generate'}
+                  </button>
+                )}
+              </div>
+              {worktreeError && (
+                <p className="text-xs text-red-600 dark:text-red-400 mt-1">{worktreeError}</p>
               )}
-            </div>
-            {worktreeError && (
-              <p className="text-xs text-red-600 dark:text-red-400 mt-1">{worktreeError}</p>
-            )}
-            {!hasApiKey && !formData.worktreeTemplate && (
-              <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
-                Session name is required. Add an Anthropic API key in Settings to enable AI-powered auto-naming.
+              {!hasApiKey && !formData.worktreeTemplate && (
+                <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
+                  Session name is required. Add an Anthropic API key in Settings to enable AI-powered auto-naming.
+                </p>
+              )}
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                {!worktreeError && !(!hasApiKey && !formData.worktreeTemplate) && 'The name that will be used to label your session and create your worktree folder.'}
               </p>
-            )}
-            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-              {!worktreeError && !(!hasApiKey && !formData.worktreeTemplate) && 'The name that will be used to label your session and create your worktree folder.'}
-            </p>
-          </div>
+            </div>
+          )}
           
-          {branches.length > 0 && (
+          {!isAlphaView && branches.length > 0 && (
             <div>
               <label htmlFor="baseBranch" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                 Base Branch
@@ -397,76 +434,80 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId }:
             </div>
           )}
           
-          <div>
-            <label htmlFor="count" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Number of Sessions
-            </label>
-            <input
-              id="count"
-              type="number"
-              min="1"
-              max="10"
-              value={formData.count}
-              onChange={(e) => setFormData({ ...formData, count: parseInt(e.target.value) || 1 })}
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 dark:text-gray-100 bg-white dark:bg-gray-700 placeholder-gray-500 dark:placeholder-gray-400"
-            />
-            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-              Creates multiple sessions with numbered suffixes
-            </p>
-          </div>
-          
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              Permission Mode
-            </label>
-            <div className="space-y-2">
-              <label className="flex items-center gap-2 cursor-pointer group">
-                <input
-                  type="radio"
-                  name="permissionMode"
-                  value="ignore"
-                  checked={formData.permissionMode === 'ignore' || !formData.permissionMode}
-                  onChange={(e) => setFormData({ ...formData, permissionMode: e.target.value as 'ignore' | 'approve' })}
-                  className="text-blue-600"
-                />
-                <div className="flex-1">
-                  <div className="flex items-center gap-2">
-                    <ShieldOff className="w-4 h-4 text-gray-500 dark:text-gray-400" />
-                    <span className="text-sm text-gray-700 dark:text-gray-200">Skip Permissions</span>
-                    <span className="text-xs text-gray-500 dark:text-gray-400">(recommended)</span>
-                  </div>
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 pl-6 group-hover:text-gray-600 dark:group-hover:text-gray-300">
-                    Claude runs with full permissions. Ideal for trusted environments and faster workflows.
-                  </p>
-                </div>
+          {!isAlphaView && (
+            <div>
+              <label htmlFor="count" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Number of Sessions
               </label>
-              <label className="flex items-center gap-2 cursor-pointer group">
-                <input
-                  type="radio"
-                  name="permissionMode"
-                  value="approve"
-                  checked={formData.permissionMode === 'approve'}
-                  onChange={(e) => setFormData({ ...formData, permissionMode: e.target.value as 'ignore' | 'approve' })}
-                  className="text-blue-600"
-                />
-                <div className="flex-1">
-                  <div className="flex items-center gap-2">
-                    <Shield className="w-4 h-4 text-green-600 dark:text-green-500" />
-                    <span className="text-sm text-gray-700 dark:text-gray-200">Manual Approval</span>
-                    <span className="text-xs text-gray-500 dark:text-gray-400">(safer)</span>
-                  </div>
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 pl-6 group-hover:text-gray-600 dark:group-hover:text-gray-300">
-                    Claude asks permission for file operations. Use this for sensitive projects or when learning.
-                  </p>
-                </div>
-              </label>
-            </div>
-            <div className="mt-3 p-2 bg-blue-50 dark:bg-blue-900/20 rounded-md border border-blue-200 dark:border-blue-800">
-              <p className="text-xs text-blue-600 dark:text-blue-400">
-                <strong>Note:</strong> This setting only affects new sessions. You can change the default in Settings.
+              <input
+                id="count"
+                type="number"
+                min="1"
+                max="10"
+                value={formData.count}
+                onChange={(e) => setFormData({ ...formData, count: parseInt(e.target.value) || 1 })}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 dark:text-gray-100 bg-white dark:bg-gray-700 placeholder-gray-500 dark:placeholder-gray-400"
+              />
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                Creates multiple sessions with numbered suffixes
               </p>
             </div>
-          </div>
+          )}
+          
+          {!isAlphaView && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Permission Mode
+              </label>
+              <div className="space-y-2">
+                <label className="flex items-center gap-2 cursor-pointer group">
+                  <input
+                    type="radio"
+                    name="permissionMode"
+                    value="ignore"
+                    checked={formData.permissionMode === 'ignore' || !formData.permissionMode}
+                    onChange={(e) => setFormData({ ...formData, permissionMode: e.target.value as 'ignore' | 'approve' })}
+                    className="text-blue-600"
+                  />
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2">
+                      <ShieldOff className="w-4 h-4 text-gray-500 dark:text-gray-400" />
+                      <span className="text-sm text-gray-700 dark:text-gray-200">Skip Permissions</span>
+                      <span className="text-xs text-gray-500 dark:text-gray-400">(recommended)</span>
+                    </div>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 pl-6 group-hover:text-gray-600 dark:group-hover:text-gray-300">
+                      Claude runs with full permissions. Ideal for trusted environments and faster workflows.
+                    </p>
+                  </div>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer group">
+                  <input
+                    type="radio"
+                    name="permissionMode"
+                    value="approve"
+                    checked={formData.permissionMode === 'approve'}
+                    onChange={(e) => setFormData({ ...formData, permissionMode: e.target.value as 'ignore' | 'approve' })}
+                    className="text-blue-600"
+                  />
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2">
+                      <Shield className="w-4 h-4 text-green-600 dark:text-green-500" />
+                      <span className="text-sm text-gray-700 dark:text-gray-200">Manual Approval</span>
+                      <span className="text-xs text-gray-500 dark:text-gray-400">(safer)</span>
+                    </div>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 pl-6 group-hover:text-gray-600 dark:group-hover:text-gray-300">
+                      Claude asks permission for file operations. Use this for sensitive projects or when learning.
+                    </p>
+                  </div>
+                </label>
+              </div>
+              <div className="mt-3 p-2 bg-blue-50 dark:bg-blue-900/20 rounded-md border border-blue-200 dark:border-blue-800">
+                <p className="text-xs text-blue-600 dark:text-blue-400">
+                  <strong>Note:</strong> This setting only affects new sessions. You can change the default in Settings.
+                </p>
+              </div>
+            </div>
+          )}
           </form>
         </div>
         
@@ -486,13 +527,13 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId }:
           <button
             type="submit"
             form="create-session-form"
-            disabled={isSubmitting || !formData.prompt || !!worktreeError || (!hasApiKey && !formData.worktreeTemplate)}
+            disabled={isSubmitting || !formData.prompt || !!worktreeError || (!hasApiKey && !formData.worktreeTemplate && !isAlphaView)}
             className="px-5 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-blue-400 disabled:cursor-not-allowed font-medium transition-colors shadow-sm hover:shadow"
             title={
               isSubmitting ? 'Creating session...' :
               !formData.prompt ? 'Please enter a prompt' :
               worktreeError ? 'Please fix the session name error' :
-              (!hasApiKey && !formData.worktreeTemplate) ? 'Please enter a session name (required without API key)' :
+              (!hasApiKey && !formData.worktreeTemplate && !isAlphaView) ? 'Please enter a session name (required without API key)' :
               undefined
             }
           >
@@ -502,7 +543,7 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId }:
                 Creating...
               </span>
             ) : (
-              `Create ${(formData.count || 1) > 1 ? (formData.count || 1) + ' Sessions' : 'Session'}`
+              isAlphaView ? 'Create Conversation' : `Create ${(formData.count || 1) > 1 ? (formData.count || 1) + ' Sessions' : 'Session'}`
             )}
           </button>
         </div>

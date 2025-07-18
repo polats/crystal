@@ -1401,6 +1401,7 @@ export function DraggableProjectTreeView() {
           }}
           projectName={selectedProjectForCreate?.name}
           projectId={selectedProjectForCreate?.id}
+          isAlphaView={selectedProjectForCreate?.alpha_view || false}
         />
       )}
       

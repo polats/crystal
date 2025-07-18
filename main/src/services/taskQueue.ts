@@ -173,7 +173,9 @@ export class TaskQueue {
           run_script: targetProject.run_script
         }, null, 2));
 
-        const { worktreePath } = await worktreeManager.createWorktree(targetProject.path, worktreeName, undefined, baseBranch, targetProject.worktree_folder);
+        // Use "conversations" folder for alpha projects, otherwise use project's worktree_folder setting
+        const effectiveWorktreeFolder = targetProject.alpha_view ? 'conversations' : targetProject.worktree_folder;
+        const { worktreePath } = await worktreeManager.createWorktree(targetProject.path, worktreeName, undefined, baseBranch, effectiveWorktreeFolder);
         console.log(`[TaskQueue] Worktree created at: ${worktreePath}`);
         
         const sessionName = worktreeName;

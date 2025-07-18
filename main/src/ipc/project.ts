@@ -84,9 +84,75 @@ export function registerProjectHandlers(ipcMain: IpcMain, services: AppServices)
           nodeExecSync(`git checkout -b ${branchName}`, { encoding: 'utf-8', cwd: projectData.path });
           console.log(`[Main] Created and checked out branch: ${branchName}`);
 
-          // Create initial commit
-          nodeExecSync('git commit -m "Initial commit" --allow-empty', { encoding: 'utf-8', cwd: projectData.path });
-          console.log('[Main] Created initial empty commit');
+          // For alpha projects, copy template files before initial commit
+          const isAlphaProjectForGit = projectData.path.includes('/alphas/');
+          if (isAlphaProjectForGit) {
+            console.log('[Main] Alpha project detected, copying template files before initial commit...');
+            try {
+              const { readdirSync, copyFileSync, readFileSync, writeFileSync } = require('fs');
+              const path = require('path');
+              
+              // Get the app directory (where templates folder is located)
+              const appDir = app.isPackaged 
+                ? path.dirname(app.getPath('exe'))
+                : process.cwd();
+              
+              const templatesDir = path.join(appDir, 'templates');
+              console.log('[Main] Templates directory:', templatesDir);
+              
+              if (existsSync(templatesDir)) {
+                // Read all files from templates directory
+                const templateFiles = readdirSync(templatesDir);
+                console.log('[Main] Template files found:', templateFiles);
+                
+                for (const file of templateFiles) {
+                  const sourcePath = path.join(templatesDir, file);
+                  let destFileName = file;
+                  
+                  // Rename initial-core-memory.md to CLAUDE.md
+                  if (file === 'initial-core-memory.md') {
+                    destFileName = 'CLAUDE.md';
+                  }
+                  
+                  const destPath = path.join(projectData.path, destFileName);
+                  
+                  if (file === 'README.md') {
+                    // Read, replace placeholder, and write
+                    let content = readFileSync(sourcePath, 'utf-8');
+                    content = content.replace('$ALPHA_NAME', projectData.name);
+                    writeFileSync(destPath, content);
+                    console.log('[Main] Copied and processed README.md');
+                  } else {
+                    // Just copy the file
+                    copyFileSync(sourcePath, destPath);
+                    console.log(`[Main] Copied ${file} as ${destFileName}`);
+                  }
+                }
+                
+                // Add all template files to git
+                nodeExecSync('git add .', { encoding: 'utf-8', cwd: projectData.path });
+                console.log('[Main] Added template files to git');
+                
+                // Create initial commit with template files
+                nodeExecSync('git commit -m "Initial commit with alpha project templates"', { encoding: 'utf-8', cwd: projectData.path });
+                console.log('[Main] Created initial commit with template files');
+              } else {
+                console.log('[Main] Templates directory not found at:', templatesDir);
+                // Create empty initial commit if no templates
+                nodeExecSync('git commit -m "Initial commit" --allow-empty', { encoding: 'utf-8', cwd: projectData.path });
+                console.log('[Main] Created initial empty commit');
+              }
+            } catch (error) {
+              console.error('[Main] Failed to copy template files:', error);
+              // Create empty initial commit if template copying fails
+              nodeExecSync('git commit -m "Initial commit" --allow-empty', { encoding: 'utf-8', cwd: projectData.path });
+              console.log('[Main] Created initial empty commit (template copy failed)');
+            }
+          } else {
+            // For non-alpha projects, create empty initial commit
+            nodeExecSync('git commit -m "Initial commit" --allow-empty', { encoding: 'utf-8', cwd: projectData.path });
+            console.log('[Main] Created initial empty commit');
+          }
           
           // Verify git folder was created
           const gitPath = require('path').join(projectData.path, '.git');
@@ -114,75 +180,6 @@ export function registerProjectHandlers(ipcMain: IpcMain, services: AppServices)
         }
       }
 
-      // Check if this is an alpha project (path contains /alphas/)
-      const isAlphaProject = projectData.path.includes('/alphas/');
-      
-      // Copy template files for alpha projects
-      if (isAlphaProject) {
-        console.log('[Main] Alpha project detected, copying template files...');
-        try {
-          const { readdirSync, copyFileSync, readFileSync, writeFileSync } = require('fs');
-          const path = require('path');
-          
-          // Get the app directory (where templates folder is located)
-          const appDir = app.isPackaged 
-            ? path.dirname(app.getPath('exe'))
-            : process.cwd();
-          
-          const templatesDir = path.join(appDir, 'templates');
-          console.log('[Main] Templates directory:', templatesDir);
-          
-          if (existsSync(templatesDir)) {
-            // Read all files from templates directory
-            const templateFiles = readdirSync(templatesDir);
-            console.log('[Main] Template files found:', templateFiles);
-            
-            for (const file of templateFiles) {
-              const sourcePath = path.join(templatesDir, file);
-              let destFileName = file;
-              
-              // Rename initial-core-memory.md to CLAUDE.md
-              if (file === 'initial-core-memory.md') {
-                destFileName = 'CLAUDE.md';
-              }
-              
-              // Skip avatar-prompt.md during initial copy - we'll copy it separately
-              if (file === 'avatar-prompt.md') {
-                continue;
-              }
-              
-              const destPath = path.join(projectData.path, destFileName);
-              
-              if (file === 'README.md') {
-                // Read, replace placeholder, and write
-                let content = readFileSync(sourcePath, 'utf-8');
-                content = content.replace('$ALPHA_NAME', projectData.name);
-                writeFileSync(destPath, content);
-                console.log('[Main] Copied and processed README.md');
-              } else {
-                // Just copy the file
-                copyFileSync(sourcePath, destPath);
-                console.log(`[Main] Copied ${file} as ${destFileName}`);
-              }
-            }
-            
-            // Copy avatar-prompt.md separately so users can customize it
-            const avatarPromptSource = path.join(templatesDir, 'avatar-prompt.md');
-            const avatarPromptDest = path.join(projectData.path, 'avatar-prompt.md');
-            if (existsSync(avatarPromptSource)) {
-              copyFileSync(avatarPromptSource, avatarPromptDest);
-              console.log('[Main] Copied avatar-prompt.md for user customization');
-            }
-            
-            // Avatar generation is now only handled from project settings, not during creation
-          } else {
-            console.log('[Main] Templates directory not found at:', templatesDir);
-          }
-        } catch (error) {
-          console.error('[Main] Failed to copy template files:', error);
-          // Continue anyway - project creation should not fail due to template copy failure
-        }
-      }
 
       // Check if this is an alpha project and set alpha_view to true by default
       const isAlphaProjectForCreation = projectData.path.includes('/alphas/');
@@ -254,7 +251,9 @@ export function registerProjectHandlers(ipcMain: IpcMain, services: AppServices)
       const project = databaseService.setActiveProject(parseInt(projectId));
       if (project) {
         sessionManager.setActiveProject(project);
-        await worktreeManager.initializeProject(project.path);
+        // Use "conversations" folder for alpha projects, otherwise use project's worktree_folder setting
+        const effectiveWorktreeFolder = project.alpha_view ? 'conversations' : project.worktree_folder;
+        await worktreeManager.initializeProject(project.path, effectiveWorktreeFolder);
       }
       return { success: true };
     } catch (error) {
